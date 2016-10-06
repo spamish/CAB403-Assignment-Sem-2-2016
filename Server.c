@@ -97,52 +97,36 @@ int main(int argc, char *argv[])
 
 int client_actions(int id)
 {
-    int num = TRUE, cont = TRUE;
-    char buff[BUFFSIZE];
-    char rec[BUFFSIZE];
+    int num, cont = TRUE;
+    char rec[BUFFINIT];
+    char sen[BUFFINIT];
     
-    printf("Receive data\n");
+    memset(rec, 0, BUFFINIT);
+    memset(sen, 0, BUFFINIT);
     
+    printf("Receive instruction\n");
     
-    while (num > 0) {
-        if ((num = read(id, rec, BUFFSIZE)) == ERROR)
-        {
-            perror("Problem receiving instruction");
-            cont = FALSE;
-        }
-
-        printf("Data read: %s/%d\n", rec, num);
-        sprintf(buff, "%s%s", buff, rec);
-        printf("mess: %s, siz: %d\n", buff, strlen(buff));
-    }
-    
-    sprintf(buff, "%s%c", buff, '\0');
-    printf("mess: %s, siz: %d\n", buff, strlen(buff));
-    
-    switch (buff[0])
+    if ((num = read(id, rec, BUFFSIZE)) > FIN)
     {
-        case EXIT:
-            sprintf(buff, "exit");
-            
-            if (send(id, buff, strlen(buff), 0) == ERROR)
-            {
-                perror("Problem sending response");
-            }
-            
-            cont = FALSE;
-            break;
-        
-        default:
-            sprintf(buff, "Instruction recieved");
-            
-            if (send(id, buff, strlen(buff), 0) == ERROR)
-            {
-                perror("Problem sending response");
-            }
-            break;
+        rec[BUFFSIZE] = '\0';
+        printf("mess: %s, siz: %d\n", rec, strlen(rec));
     }
     
-    printf("Response sent: %s\n", buff);
+    if (num <= FIN)
+    {
+        perror("Problem receiving instruction");
+        cont = FALSE;
+    }
+    
+    sprintf(sen, "Instruction recieved");
+    
+    if (send(id, sen, strlen(sen), 0) == ERROR)
+    {
+        perror("Problem sending response");
+        cont = FALSE;
+    }
+    
+    printf("mess: %s, siz: %d\n", sen, strlen(sen));
     
     return cont;
 }

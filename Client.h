@@ -23,9 +23,10 @@
 #define ERROR           -1
 #define TRUE            1
 #define FALSE           0
+#define FIN             0
 
 /** @brief Description
  *  @param variable_name Description of variable
  *  @return Description of return
  */
-int auto_mach_tell(int id, char *buff);
+int auto_mach_tell(int id);

@@ -58,7 +58,6 @@ int main(int argc, char *argv[])
         exit(1);
     }
     
-    memset(&buffer, '0', BUFFINIT);
     printf("Connected to server, buffer size: %d\n", strlen(buffer));
     
     if ((numbytes = read(conn, buffer, BUFFSIZE)) == ERROR)
@@ -70,34 +69,42 @@ int main(int argc, char *argv[])
     buffer[numbytes] = '\0';
     printf("ID confirmed as %s", buffer);
     
-    while (auto_mach_tell(conn, buffer)) {}
+    while (auto_mach_tell(conn)) {}
 }
 
-int auto_mach_tell(int id, char *buff)
+int auto_mach_tell(int id)
 {
-    int num = 0;
+    int num, cont = TRUE;
+    char rec[BUFFINIT];
+    char sen[BUFFINIT];
+    
+    memset(rec, 0, BUFFINIT);
+    memset(sen, 0, BUFFINIT);
     
     printf("\nInput please? ");
-    scanf("%s", buff);
-    printf("%s\n", buff);
+    scanf("%s", sen);
     
-    if (send(id, buff, strlen(buff), 0) == ERROR)
+    if (send(id, sen, strlen(sen), 0) == ERROR)
     {
-        perror("Problem sending instruction");
+        perror("Problem sending response");
+        cont = FALSE;
     }
     
-    printf("Data sent: %s\n", buff);
-    memset(&buff, '0', BUFFINIT);
+    printf("mess: %s, siz: %d\n", sen, strlen(sen));
     
-    if ((num = read(id, &buff, BUFFSIZE)) == ERROR)
+    if ((num = read(id, rec, BUFFSIZE)) > FIN)
     {
-		perror("Problem receiving response");
-	}
+        rec[BUFFSIZE] = '\0';
+        printf("mess: %s, siz: %d\n", rec, strlen(rec));
+    }
     
-    buff[num] = '\0';
-    printf("size: %d, message: %s\n", num, buff);
+    if (num <= FIN)
+    {
+        perror("Problem receiving response");
+        cont = FALSE;
+    }
     
-    return TRUE;
+    return cont;
 }
     
     /*Display welcome message
