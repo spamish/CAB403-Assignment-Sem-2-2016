@@ -15,7 +15,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <arpa/inet.h>
+#include <sys/wait.h>
+
 #define BUFFSIZE        100
+#define BUFFINIT        101
 #define ERROR           -1
 #define TRUE            1
 #define FALSE           0
@@ -24,3 +28,4 @@
  *  @param variable_name Description of variable
  *  @return Description of return
  */
+int auto_mach_tell(int id, char *buff);

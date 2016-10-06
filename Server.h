@@ -20,9 +20,20 @@
 #define DEFAULT_PORT    12345
 #define BACKLOG         1
 #define BUFFSIZE        100
+#define BUFFINIT        101
 #define ERROR           -1
 #define TRUE            1
 #define FALSE           0
+#define FIN             0
+
+#define USERNAME        '1'
+#define PASSWORD        '2'
+#define ACCOUNTS        '3'
+#define TRANSFER        '4'
+#define BALANCE         '5'
+#define HISTORY         '6'
+#define FINISH          '7'
+#define EXIT            '8'
 
 /** @brief Loop to read and handle client actions
  *  @param id Client ID

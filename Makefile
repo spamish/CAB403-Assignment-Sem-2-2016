@@ -19,7 +19,16 @@ Server.o: Server.c
 	gcc -std=c99 -c Server.c
 
 
+debug: BugCli BugSer
+
+BugCli: Client.c
+	gcc -std=c99 -g -o debug_client Client.c
+
+BugSer: Server.c
+	gcc -std=c99 -g -o debug_server Server.c
+
+
 clean:
-	rm -f Client Server *.o
+	rm -f Client Server *.o *.exe
 
 .PHONY: all clean
