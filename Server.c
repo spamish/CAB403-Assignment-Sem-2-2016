@@ -18,6 +18,8 @@ int main(int argc, char *argv[])
     socklen_t sock_size;
     char buffer[BUFFSIZE];
     
+    // @todo read in files and set up databases
+    
     // check if port number is given.
     if (argc == 2)
     {
@@ -34,14 +36,10 @@ int main(int argc, char *argv[])
         exit(1);
     }
     
-    printf("Socket created\n");
-    
     // set the endpoint
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port);
     server_addr.sin_addr.s_addr = INADDR_ANY;
-    
-    printf("Endpoint set\n");
     
     // bind socket to the endpoint
     if (bind(sock, (struct sockaddr *) &server_addr, \
@@ -50,8 +48,6 @@ int main(int argc, char *argv[])
         perror("Problem binding socket");
         exit(1);
     }
-    
-    printf("Socket bound\n");
     
     // start listening
     if (listen(sock, BACKLOG) == ERROR)
@@ -75,9 +71,9 @@ int main(int argc, char *argv[])
             continue;
         }
         
-        printf("Client connected to server\n");
         sprintf(buffer, "%d", conn);
         
+        // send id to user for future expansion and confirmation
         if (send(conn, buffer, strlen(buffer), 0) == ERROR)
         {
             perror("Problem sending id");
@@ -85,8 +81,9 @@ int main(int argc, char *argv[])
             continue;
         }
         
-        printf("Client details sent: %d\n", conn);
+        printf("Client connected, id: %d\n", conn);
         
+        // client connected and doing shit
         while(client_actions(conn)) {}
         
         // close client connection
@@ -97,76 +94,129 @@ int main(int argc, char *argv[])
 
 int client_actions(int id)
 {
-    int num, cont = TRUE;
+    int num;
     char rec[BUFFINIT];
     char sen[BUFFINIT];
-    
+    // BUFFERS!
     memset(rec, 0, BUFFINIT);
     memset(sen, 0, BUFFINIT);
     
     printf("Receive instruction\n");
     
+    // retreive client instruction
     if ((num = read(id, rec, BUFFSIZE)) > FIN)
     {
         rec[BUFFSIZE] = '\0';
-        printf("mess: %s, siz: %d\n", rec, strlen(rec));
     }
     
     if (num <= FIN)
     {
-        perror("Problem receiving instruction");
-        cont = FALSE;
+        printf("Problem receiving instruction");
+        return FALSE;
     }
     
-    sprintf(sen, "Instruction recieved");
+    printf("Handle instruction\n");
     
+    // command goes off for processing
+    handler(sen, rec);
+    
+    // send response (might change to within handler)
     if (send(id, sen, strlen(sen), 0) == ERROR)
     {
         perror("Problem sending response");
-        cont = FALSE;
+        return FALSE;
     }
     
     printf("mess: %s, siz: %d\n", sen, strlen(sen));
     
-    return cont;
+    // nothing fucked up, wait for more from client
+    return TRUE;
 }
 
-        /*case USERNAME:
-            //Check if exists
+void handler(char *sen, char *rec)
+{
+    size_t siz;
+    int prog = 0;
+    // @todo set to maximum number of arguments
+    char **arguments = malloc(sizeof(*arguments)*2);
+    
+    switch (rec[prog++] - PAD)
+    {
+        case LOGIN:
+            // @param username password
+            // @return accountno firstname lastname
+            // @fail exit
             
+            // retrieve username
+            siz = (rec[prog++] - PAD) * sizeof(char);
+            arguments[0] = (char *) malloc(siz);
+            memcpy(arguments[0], &rec[prog], siz);
+            prog += siz;
+            
+            // retrieve password
+            siz = (rec[prog++] - PAD) * sizeof(char);
+            arguments[1] = (char *) malloc(siz);
+            memcpy(arguments[1], &rec[prog], siz);
+            
+            // @todo check username and password
+            
+            // @todo return login for pass or exit for fail
+            
+            sprintf(sen, "%c", LOGIN + PAD);
             break;
         
-        case password
-            Check if correct
-            send(Pass or fail)
+        case ACCOUNTS:
+            // @param accountno
+            // @return array[accountno]
+            
+            // @todo check client accounts
+            sprintf(sen, "%c", ACCOUNTS + PAD);
             break;
         
-        case accounts
-            Check client accounts
-            send(existing accounts)
+        case TRANSFER:
+            // @param 
+            // @return 
+            
+            // @todo check account number
+            sprintf(sen, "%c", TRANSFER + PAD);
             break;
         
-        case transfer
-            Check account number
-            send(Pass or fail)
+        case BALANCE:
+            // @param accountno
+            // @return openingbal closingbal
+            
+            sprintf(sen, "%c", BALANCE + PAD);
             break;
         
-        case balance
-            send(account balance)
+        case HISTORY:
+            // @param accountno
+            // @return array[fromaccount toaccount trantype amount]
+            
+            sprintf(sen, "%c", HISTORY + PAD);
             break;
         
-        case history
-            send(transaction listings)
+        case EXIT:
+            // @param exit
+            // @return exit
+            
+            sprintf(sen, "%c", EXIT + PAD);
             break;
         
-        case finish
-            Move transaction from temporary to permanent data
-            break;*/
+        case FINISH:
+            // @param 
+            // @return finish
+            
+            // @todo move transaction from temporary to permanent data
+            sprintf(sen, "%c", FINISH + PAD);
+            break;
+    }
+}
 
 void interrupt(int dummy)
 {
     printf("Shutdown initiated\n");
     
+    // stop receiving on socket
     if (shutdown(sock, 1) == ERROR)
     {
         perror("Problem shutting down socket");
@@ -175,14 +225,11 @@ void interrupt(int dummy)
     
     printf("Closing connections\n");
     
-    if (close(sock) == ERROR)
-    {
-        perror("Problem closing socket");
-        exit(1);
-    }
-    
+    // close connections to clients
     if (conn)
     {
+        // @todo send closing notification to clients
+        
         if (close(conn) == ERROR)
         {
             perror("Problem closing socket");
@@ -190,7 +237,16 @@ void interrupt(int dummy)
         }
     }
     
+    // close socket
+    if (close(sock) == ERROR)
+    {
+        perror("Problem closing socket");
+        exit(1);
+    }
+    
     //printf("Saving data\n");
+    
+    // @todo update data in text files
     
     printf("Exiting program\n");
     exit(0);

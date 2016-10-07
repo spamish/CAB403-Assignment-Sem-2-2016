@@ -1,12 +1,5 @@
 #include "Client.h"
-
-/*Pass or fail
-==
-Pass {
-    cont
-} else {
-    return error;
-}*/
+#include "Textable.h"
 
 int main(int argc, char *argv[])
 {
@@ -16,10 +9,11 @@ int main(int argc, char *argv[])
      * ip_address   - ip address of server
      * buffer       - buffer to place text data in
      */
-    int conn, port, numbytes = 0;
+    int conn, id, port, numbytes = 0;
     struct sockaddr_in conn_addr;
     struct hostent *ip_address;
-    char buffer[BUFFSIZE];
+    char message[BUFFSIZE];
+    char reply[BUFFSIZE];
     
     // check input parameters
     if (argc != 3)
@@ -42,15 +36,12 @@ int main(int argc, char *argv[])
         exit(1);
     }
     
-    printf("Socket created\n");
-    
     // set the endpoint
 	conn_addr.sin_family = AF_INET;
 	conn_addr.sin_port = htons(atoi(argv[2]));
 	conn_addr.sin_addr = *((struct in_addr *) ip_address->h_addr);
     
-    printf("Endpoint set\n");
-    
+    // connect to server
     if (connect(conn, (struct sockaddr *)&conn_addr, \
             sizeof(struct sockaddr)) == ERROR)
     {
@@ -58,89 +49,126 @@ int main(int argc, char *argv[])
         exit(1);
     }
     
-    printf("Connected to server, buffer size: %d\n", strlen(buffer));
-    
-    if ((numbytes = read(conn, buffer, BUFFSIZE)) == ERROR)
+    // get id
+    if ((numbytes = read(conn, reply, BUFFSIZE)) > FIN)
     {
-		perror("Problem receiving message");
-		exit(1);
-	}
+        reply[BUFFSIZE] = '\0';
+    }
     
-    buffer[numbytes] = '\0';
-    printf("ID confirmed as %s", buffer);
+    if (numbytes <= FIN)
+    {
+        printf("Problem receiving id\n");
+        exit(1);
+    }
     
+    // communication confirmed
+    id = atoi(reply);
+    printf("Connected to server with id: %d\n", id);
+    
+    // welcome screen and login
+    if (welcome_login(conn))
+    {
+        printf(LOGIN_FAIL);
+        exit(1);
+    }
+    
+    // logged in and doing shit
     while (auto_mach_tell(conn)) {}
 }
 
-int auto_mach_tell(int id)
+int welcome_login(int sock)
 {
-    int num, cont = TRUE;
-    char rec[BUFFINIT];
-    char sen[BUFFINIT];
+    // MOAR BUFFERS!
+    char message[BUFFSIZE];
+    char reply[BUFFSIZE];
+    char username[INPUTSIZE];
+    char password[INPUTSIZE];
     
-    memset(rec, 0, BUFFINIT);
-    memset(sen, 0, BUFFINIT);
+    memset(message, 0, BUFFINIT);
+    memset(reply, 0, BUFFINIT);
     
-    printf("\nInput please? ");
-    scanf("%s", sen);
+    // enter username
+    printf(LOGIN_WELCOME);
+    scanf("%s", &username);
     
-    if (send(id, sen, strlen(sen), 0) == ERROR)
+    // enter password
+    printf(LOGIN_PASSWORD);
+    scanf("%s", &password);
+    
+    // compile message
+    sprintf(message, "%c%c%s%c%s", LOGIN + PAD, \
+            strlen(username) + PAD, username, \
+            strlen(password) + PAD, password);
+    
+    // communicate with server
+    if(talking(sock, message, reply) == ERROR)
+    {
+        printf("Problem logging in\n");
+        exit(1);
+    }
+    
+    // check if pass or fail received
+    sprintf(message, "%c", EXIT);
+    return !strcmp(reply, message);
+}
+
+int talking(int sock, char *sen, char *rec)
+{
+    int num;
+    
+    // send message
+    if (send(sock, sen, strlen(sen), 0) == ERROR)
     {
         perror("Problem sending response");
-        cont = FALSE;
+        return FALSE;
     }
     
     printf("mess: %s, siz: %d\n", sen, strlen(sen));
     
-    if ((num = read(id, rec, BUFFSIZE)) > FIN)
+    // read response
+    if ((num = read(sock, rec, BUFFSIZE)) > FIN)
     {
         rec[BUFFSIZE] = '\0';
-        printf("mess: %s, siz: %d\n", rec, strlen(rec));
+        printf("rec: %s, siz: %d\n", rec, strlen(rec));
     }
     
+    // check if response is bullshit
     if (num <= FIN)
     {
-        perror("Problem receiving response");
-        cont = FALSE;
+        printf("Problem receiving response");
+        return FALSE;
     }
     
-    return cont;
+    return TRUE;
 }
-    
-    /*Display welcome message
-    
-    Request username
-    
-    Pass or fail
-    
-    Request password
-    
-    Pass or fail
-    
-    while (true) {
-        Display main page
-        
-        Request selection
-        
-        switch(selection)
-        {
-            case tranfer
-                status = with_depo_tran(params)
-                break
-            
-            case accounts
-                status = bala_hist(params)
-                break
-            
-            case exit
-                return exit
-            
-            case default
-                Invalid option selected
-        }
-    }*/
 
-/* return with_depo_tran(params) {
+int auto_mach_tell(int sock)
+{
+    // @todo display main page
+    
+    // @todo request selection
+    
+    /* @todo switch(selection)
+    {
+        case tranfer:
+            //status = with_depo_tran(params)
+            break
+        
+        case accounts:
+            //status = bala_hist(params)
+            break
+        
+        case exit:
+            //return exit
+        
+        default:
+            printf(FAIL)
+    }*/
+    
+    return TRUE;
+}
+
+/* @todo return with_depo_tran(params) {
     Display accounts
     
     Pass or fail
@@ -160,7 +188,7 @@ int auto_mach_tell(int id)
     return
 } */
 
-/* return bala_hist(params) {
+/* @todo return bala_hist(params) {
     Display accounts
     
     if (accounts) {
