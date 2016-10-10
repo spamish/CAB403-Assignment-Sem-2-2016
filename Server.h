@@ -7,25 +7,37 @@
 
 #include "Constants.h"
 
-/** @brief Loop to read and handle client actions
+/*  @brief 
+ *  @param 
+ *  @return 
+ */
+int get_lines(FILE *data);
+
+/*  @brief Loop to read and handle client actions
  *  @param id Client ID
  *  @return Continuation status
  */
 int client_actions(int id);
 
-/** @brief Loop to read and handle client actions
- *  @param id Client ID
- *  @return Continuation status
+/*  @brief 
+ *  @param 
+ *  @return 
  */
 void handler(char *sen, char *rec);
 
-/** @brief Loop to read and handle client actions
- *  @param id Client ID
- *  @return Continuation status
+/*  @brief 
+ *  @param 
+ *  @return 
  */
 void extract_variables(char *var, char *str, char *rem);
 
-/** @brief Interrupt handler for CTRL C
+/*  @brief 
+ *  @param 
+ *  @return 
+ */
+int authenticate_client(char *username, char *password);
+
+/*  @brief Interrupt handler for CTRL C
  *  @param dummy Dummy variable.
  *  @return void
  */

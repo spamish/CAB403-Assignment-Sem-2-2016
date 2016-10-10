@@ -1,6 +1,8 @@
 #include "Client.h"
 #include "Textable.h"
 
+DB_CLIENT *client;
+
 int main(int argc, char *argv[])
 {
     /* sock         - id of socket
@@ -14,6 +16,7 @@ int main(int argc, char *argv[])
     struct hostent *ip_address;
     char message[BUFFSIZE];
     char reply[BUFFSIZE];
+    client = malloc(sizeof(DB_CLIENT) * 1);
     
     // check input parameters
     if (argc != 3)
@@ -42,7 +45,7 @@ int main(int argc, char *argv[])
 	conn_addr.sin_addr = *((struct in_addr *) ip_address->h_addr);
     
     // connect to server
-    if (connect(conn, (struct sockaddr *)&conn_addr, \
+    if (connect(conn, (struct sockaddr *) &conn_addr, \
             sizeof(struct sockaddr)) == ERROR)
     {
         perror("Problem connecting to server");
@@ -68,9 +71,15 @@ int main(int argc, char *argv[])
     // welcome screen and login
     if (welcome_login(conn))
     {
-        printf(LOGIN_FAIL);
+        printf("%s", LOGIN_FAIL);
         exit(1);
     }
+    
+    printf("%s %s %s\n", LANDING_NAME, \
+            client[0].firstname, \
+            client[0].lastname);
+    printf("%s %s\n", LANDING_ID, \
+            client[0].client);
     
     // logged in and doing shit
     while (auto_mach_tell(conn)) {}
@@ -83,16 +92,18 @@ int welcome_login(int sock)
     char reply[BUFFSIZE];
     char username[INPUTSIZE];
     char password[INPUTSIZE];
+    size_t siz;
+    int prog = 0;
     
-    memset(message, 0, BUFFINIT);
-    memset(reply, 0, BUFFINIT);
+    memset(message, '\0', BUFFINIT);
+    memset(reply, '\0', BUFFINIT);
     
     // enter username
-    printf(LOGIN_WELCOME);
+    printf("%s", LOGIN_WELCOME);
     scanf("%s", &username);
     
     // enter password
-    printf(LOGIN_PASSWORD);
+    printf("%s", LOGIN_PASSWORD);
     scanf("%s", &password);
     
     // compile message
@@ -108,8 +119,28 @@ int welcome_login(int sock)
     }
     
     // check if pass or fail received
-    sprintf(message, "%c", EXIT);
-    return !strcmp(reply, message);
+    sprintf(message, "%d", EXIT);
+    if (!strcmp(reply, message))
+    {
+        return TRUE;
+    }
+    
+    // assign client information
+    siz = (reply[prog++] - PAD) * sizeof(char);
+    memcpy(client[0].firstname, &reply[prog], siz);
+    client[0].firstname[siz] = '\0';
+    prog += siz;
+    
+    siz = (reply[prog++] - PAD) * sizeof(char);
+    memcpy(client[0].lastname, &reply[prog], siz);
+    client[0].lastname[siz] = '\0';
+    prog += siz;
+    
+    siz = (reply[prog++] - PAD) * sizeof(char);
+    memcpy(client[0].client, &reply[prog], siz);
+    client[0].client[siz] = '\0';
+    
+    return FALSE;
 }
 
 int talking(int sock, char *sen, char *rec)
@@ -144,9 +175,11 @@ int talking(int sock, char *sen, char *rec)
 
 int auto_mach_tell(int sock)
 {
-    // @todo display main page
-    
-    // @todo request selection
+    char input[INPUTSIZE];
+    memset(input, '\0', INPUTSIZE);
+    // display menu and request input
+    printf("%s", LANDING_MENU);
+    scanf("%s", input);
     
     /* @todo switch(selection)
     {

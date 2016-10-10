@@ -30,9 +30,9 @@ const char *LOGIN_PASSWORD = "Please enter your password: ";
 const char *LOGIN_FAIL     = "You have entered either an incorrect username or password. Please try again later\n\n";
 
 // Main menu
-const char *LANDING_NAME = "Successfully logged in as: ";
+const char *LANDING_NAME = "Successfully logged in as:";
 
-const char *LANDING_ID   = "\nClient number: ";
+const char *LANDING_ID   = "Client number:";
 
 const char *LANDING_MENU = "\n \
 Please select from the following options\n \
