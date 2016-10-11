@@ -20,14 +20,13 @@
 #define DEFAULT_PORT    12345
 #define BACKLOG         1
 #define BUFFSIZE        100
-#define BUFFINIT        101
 #define INPUTSIZE       20
 #define PAD             '0'
+#define CANCEL          'c'
 #define ERROR           -1
 #define TRUE            1
 #define FALSE           0
 #define FIN             0
-#define CANCEL          c
 #define ARGS            10
 
 #define LOGIN           1
@@ -37,6 +36,16 @@
 #define HISTORY         5
 #define EXIT            6
 #define FINISH          7
+
+#define SAVE            11
+#define LOAN            12
+#define CRED            13
+
+#define BALA            1
+#define DEPO            2
+#define WITH            3
+#define TRAN            4
+#define HIST            5
 
 /* @brief authentication struct
  */

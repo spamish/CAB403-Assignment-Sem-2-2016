@@ -24,3 +24,27 @@ int talking(int sock, char *sen, char *rec);
  *  @return Description of return
  */
 int auto_mach_tell(int sock);
+
+/** @brief Description
+ *  @param variable_name Description of variable
+ *  @return Description of return
+ */
+int with_depo_tran(int sock, int type);
+
+/** @brief Description
+ *  @param variable_name Description of variable
+ *  @return Description of return
+ */
+int bala_hist(int sock, int type);
+
+/** @brief Description
+ *  @param variable_name Description of variable
+ *  @return Description of return
+ */
+int select_account(int stage, int ext, char *acc);
+
+/** @brief Description
+ *  @param variable_name Description of variable
+ *  @return Description of return
+ */
+void numbering(int val);

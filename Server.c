@@ -20,7 +20,8 @@ int main(int argc, char *argv[])
     int loc, port = DEFAULT_PORT;
     struct sockaddr_in server_addr, client_addr;
     socklen_t sock_size;
-    char dummy[BUFFSIZE], buffer[BUFFSIZE], accounts[BUFFSIZE];
+    char dummy[BUFFSIZE], buffer[BUFFSIZE], accounts[BUFFSIZE], \
+            op[INPUTSIZE], cl[INPUTSIZE];
     FILE *file;
     
     // check if port number is given.
@@ -69,6 +70,21 @@ int main(int argc, char *argv[])
     file = fopen("./Accounts.txt", "r");
     ln_acc = get_lines(file);
     fseek(file, 0, SEEK_SET);
+    db_acc = malloc(sizeof(DB_ACCOUNT) * ln_acc);
+    while (fgetc(file) != '\n') {}
+    
+    for (int i = 0; i < ln_acc; i++)
+    {
+        fgets(dummy, BUFFSIZE, file);
+        sscanf(dummy, "%s %s %s ", \
+                db_acc[i].number, \
+                op, \
+                cl);
+        
+        db_acc[i].opening = atof(op);
+        db_acc[i].closing = atof(cl);
+    }
+    
     fclose(file);
     printf("number of lines in Accounts.txt = %d\n", ln_acc);
     
@@ -109,8 +125,26 @@ int main(int argc, char *argv[])
     
     // Transactions.txt
     file = fopen("./Transactions.txt", "r");
-    ln_tran = get_lines(file);
-    fseek(file, 0, SEEK_SET);
+    ln_tran = get_lines(file) - 1;
+    if (ln_tran > 0)
+    {
+        fseek(file, 0, SEEK_SET);
+        db_tran = malloc(sizeof(DB_TRANSACTION) * ln_tran);
+        while (fgetc(file) != '\n') {}
+        
+        for (int i = 0; i < ln_tran; i++)
+        {
+            fgets(dummy, BUFFSIZE, file);
+            sscanf(dummy, "%s %s %d %s ", \
+                    db_tran[i].from, \
+                    db_tran[i].to, \
+                    db_tran[i].trantype, \
+                    op);
+            
+            db_tran[i].amount = atof(op);
+        }
+    }
+    
     fclose(file);
     printf("number of lines in Transactions.txt = %d\n", ln_tran);
     
@@ -172,6 +206,8 @@ int main(int argc, char *argv[])
         // client connected and doing shit
         while(client_actions(conn)) {}
         
+        printf("Disconnecting client, id: %d\n", conn);
+        
         // close client connection
         close(conn);
         conn = 0;
@@ -210,13 +246,11 @@ int get_lines(FILE *data)
 int client_actions(int id)
 {
     int num;
-    char rec[BUFFINIT];
-    char sen[BUFFINIT];
+    char rec[BUFFSIZE];
+    char sen[BUFFSIZE];
     // BUFFERS!
-    memset(rec, '\0', BUFFINIT);
-    memset(sen, '\0', BUFFINIT);
-    
-    printf("Receive instruction\n");
+    memset(rec, '\0', BUFFSIZE);
+    memset(sen, '\0', BUFFSIZE);
     
     // retreive client instruction
     if ((num = read(id, rec, BUFFSIZE)) > FIN)
@@ -230,10 +264,12 @@ int client_actions(int id)
         return FALSE;
     }
     
-    printf("Handle instruction\n");
+    printf("ins: %s, siz: %d\n", rec, strlen(rec));
     
     // command goes off for processing
     handler(sen, rec);
+    
+    printf("rep: %s, siz: %d\n", sen, strlen(sen));
     
     // send response (might change to within handler)
     if (send(id, sen, strlen(sen), 0) == ERROR)
@@ -257,7 +293,6 @@ void handler(char *sen, char *rec)
 {
     size_t siz;
     int lookup, args = ARGS, prog = 0;
-    // @todo set to maximum number of arguments
     char **arguments = malloc(sizeof(*arguments)*args);
     memset(arguments, '\0', sizeof(*arguments)*args);
     memset(sen, '\0', BUFFSIZE);
@@ -342,7 +377,7 @@ void handler(char *sen, char *rec)
             // @param exit
             // @return exit
             
-            sprintf(sen, "%c", EXIT + PAD);
+            sprintf(sen, "%c\0", EXIT + PAD);
             break;
         
         case FINISH:
