@@ -41,10 +41,16 @@ int bala_hist(int sock, int type);
  *  @param variable_name Description of variable
  *  @return Description of return
  */
-int select_account(int stage, int ext, char *acc);
+int select_account(int sock, int stage, int ext, DB_ACCOUNT *account);
 
 /** @brief Description
  *  @param variable_name Description of variable
  *  @return Description of return
  */
 void numbering(int val);
+
+/** @brief Description
+ *  @param variable_name Description of variable
+ *  @return Description of return
+ */
+void print_money(double val);

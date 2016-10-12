@@ -33,7 +33,6 @@ int main(int argc, char *argv[])
     // setup interrupt handler
     signal(SIGINT, interrupt);
     
-    // @todo read in files and set up databases
     // Authentication.txt
     file = fopen("./Authentication.txt", "r");
     ln_auth = get_lines(file) - 1;
@@ -68,7 +67,7 @@ int main(int argc, char *argv[])
     
     // Accounts.txt
     file = fopen("./Accounts.txt", "r");
-    ln_acc = get_lines(file);
+    ln_acc = get_lines(file) - 1;
     fseek(file, 0, SEEK_SET);
     db_acc = malloc(sizeof(DB_ACCOUNT) * ln_acc);
     while (fgetc(file) != '\n') {}
@@ -138,7 +137,7 @@ int main(int argc, char *argv[])
             sscanf(dummy, "%s %s %d %s ", \
                     db_tran[i].from, \
                     db_tran[i].to, \
-                    db_tran[i].trantype, \
+                    db_tran[i].type, \
                     op);
             
             db_tran[i].amount = atof(op);
@@ -300,10 +299,12 @@ void handler(char *sen, char *rec)
     switch (rec[prog++] - PAD)
     {
         case LOGIN:
-            // @param username password
-            // @return accountno firstname lastname
-            // @fail exit
+        // @param username password
+        // @return firstname lastname client accounts[3]
+        // @fail exit
+        {
             args = 2;
+            lookup = ERROR;
             
             // retrieve username
             siz = (rec[prog++] - PAD) * sizeof(char);
@@ -317,9 +318,24 @@ void handler(char *sen, char *rec)
             arguments[1] = (char *) malloc(siz);
             memcpy(arguments[1], &rec[prog], siz);
             arguments[1][siz] = '\0';
+            prog += siz;
+            
+            // check username and password
+            for (int i = 0; i < ln_auth; i++)
+            {
+                if (!strcmp(arguments[0], db_auth[i].username))
+                {
+                    if (!strcmp(arguments[1], db_auth[i].password))
+                    {
+                        lookup = i;
+                    }
+                    
+                    break;
+                }
+            }
             
             // @todo check username and password
-            if (authenticate_client(arguments[0], arguments[1]))
+            if (lookup == ERROR)
             {
                 sprintf(sen, "%c", EXIT + PAD);
                 return;
@@ -327,7 +343,7 @@ void handler(char *sen, char *rec)
             
             for (int i = 0; i < ln_auth; i++)
             {
-                if (!strcmp(arguments[0], db_auth[i].client))
+                if (!strcmp(db_auth[lookup].client, db_cli[i].client))
                 {
                     lookup = i;
                     break;
@@ -335,58 +351,109 @@ void handler(char *sen, char *rec)
             }
 
             sprintf(sen, "%c%s%c%s%c%s%c%s%c%s%c%s", \
-                    strlen(db_cli[lookup].firstname) + PAD, db_cli[lookup].firstname, \
-                    strlen(db_cli[lookup].lastname) + PAD, db_cli[lookup].lastname, \
-                    strlen(db_cli[lookup].client) + PAD, db_cli[lookup].client, \
-                    strlen(db_cli[lookup].accounts[0]) + PAD, db_cli[lookup].accounts[0], \
-                    strlen(db_cli[lookup].accounts[1]) + PAD, db_cli[lookup].accounts[1], \
-                    strlen(db_cli[lookup].accounts[2]) + PAD, db_cli[lookup].accounts[2]);
+                    strlen(db_cli[lookup].firstname) + PAD, \
+                    db_cli[lookup].firstname, \
+                    strlen(db_cli[lookup].lastname) + PAD, \
+                    db_cli[lookup].lastname, \
+                    strlen(db_cli[lookup].client) + PAD, \
+                    db_cli[lookup].client, \
+                    strlen(db_cli[lookup].accounts[0]) + PAD, \
+                    db_cli[lookup].accounts[0], \
+                    strlen(db_cli[lookup].accounts[1]) + PAD, \
+                    db_cli[lookup].accounts[1], \
+                    strlen(db_cli[lookup].accounts[2]) + PAD, \
+                    db_cli[lookup].accounts[2]);
+            
             break;
+        }
         
         case ACCOUNTS:
-            // @param accountno
-            // @return array[accountno]
+        // @param account
+        // @return number opening closing
+        // @fail return '0'
+        {
+            args = 3;
+            lookup = ERROR;
             
-            // @todo check client accounts
-            sprintf(sen, "%c", ACCOUNTS + PAD);
+            // retrieve account
+            siz = (rec[prog++] - PAD) * sizeof(char);
+            arguments[0] = (char *) malloc(siz);
+            memcpy(arguments[0], &rec[prog], siz);
+            arguments[0][siz] = '\0';
+            prog += siz;
+            
+            // check account
+            for (int i = 0; i < ln_acc; i++)
+            {
+                if (!strcmp(arguments[0], db_acc[i].number))
+                {
+                    lookup = i;
+                    break;
+                }
+            }
+            
+            if (lookup == ERROR)
+            {
+                sprintf(sen, "%c%d", FAIL + PAD, FALSE);
+                return;
+            }
+            
+            // initialise memory for balances
+            arguments[1] = (char *) malloc(INPUTSIZE);
+            arguments[2] = (char *) malloc(INPUTSIZE);
+            
+            // get strings of balances
+            sprintf(arguments[1], "%.2f%c", db_acc[lookup].opening, '\0');
+            sprintf(arguments[2], "%.2f%c", db_acc[lookup].closing, '\0');
+            
+            sprintf(sen, "%c%s%c%s%c%s%c%s%c%s%c%s", \
+                    strlen(db_acc[lookup].number) + PAD, \
+                    db_acc[lookup].number, \
+                    strlen(arguments[1]) + PAD, \
+                    arguments[1], \
+                    strlen(arguments[2]) + PAD, \
+                    arguments[2]);
+            
             break;
+        }
         
         case TRANSFER:
-            // @param 
-            // @return 
+        // @param 
+        // @return 
+        {
             
             // @todo check account number
             sprintf(sen, "%c", TRANSFER + PAD);
             break;
-        
-        case BALANCE:
-            // @param accountno
-            // @return openingbal closingbal
-            
-            sprintf(sen, "%c", BALANCE + PAD);
-            break;
+        }
         
         case HISTORY:
-            // @param accountno
-            // @return array[fromaccount toaccount trantype amount]
+        // @param accountno
+        // @return array size array[fromaccount toaccount type amount]
+        {
             
             sprintf(sen, "%c", HISTORY + PAD);
             break;
-        
-        case EXIT:
-            // @param exit
-            // @return exit
-            
-            sprintf(sen, "%c\0", EXIT + PAD);
-            break;
+        }
         
         case FINISH:
-            // @param 
-            // @return finish
+        // @param 
+        // @return finish
+        {
             
             // @todo move transaction from temporary to permanent data
             sprintf(sen, "%c", FINISH + PAD);
             break;
+        }
+        
+        case EXIT:
+        // @param exit
+        // @return exit
+        {
+            
+            sprintf(sen, "%c\0", EXIT + PAD);
+            break;
+        }
     }
     
     for (int i = 0; i < args; i++)
@@ -418,6 +485,9 @@ int authenticate_client(char *username, char *password)
 
 void interrupt(int dummy)
 {
+    FILE *file;
+    char text[BUFFSIZE];
+    
     printf("Shutdown initiated\n");
     
     if (sock != ERROR)
@@ -451,11 +521,45 @@ void interrupt(int dummy)
         }
     }
     
-    //printf("Saving data\n");
+    printf("Saving data\n");
     
-    // @todo update data in text files
+    // Accounts.txt
+    file = fopen("./Accounts.txt", "w");
+    fseek(file, 0, SEEK_SET);
+    fprintf(file, "AccountNo      OpeningBal     ClosingBal\n");
+    
+    for (int i = 0; i < ln_acc; i++)
+    {
+        fprintf(file, "%-9s%14.2f%14.2f\n", \
+                db_acc[i].number, \
+                db_acc[i].opening, \
+                db_acc[i].closing);
+    }
+    
+    // Transactions.txt
+    if (ln_tran)
+    {
+        file = fopen("./Transactions.txt", "w");
+        fseek(file, 0, SEEK_SET);
+        fprintf(file, "FromAccount      ToAccount       TranType    Amount\n");
+        
+        for (int i = 0; i < ln_tran; i++)
+        {
+            fprintf(file, "%-15s%10s%12c%14.2f\n", \
+                    db_tran[i].from, \
+                    db_tran[i].to, \
+                    db_tran[i].type[0], \
+                    db_tran[i].amount);
+        }
+    }
     
     printf("Exiting program\n");
+    
+    // free memory
+    free(db_auth);
+    free(db_acc);
+    free(db_cli);
+    free(db_tran);
     
     exit(0);
 }

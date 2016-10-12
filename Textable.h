@@ -49,7 +49,10 @@ const char *LANDING_EXIT = "Thank you for choosing this ATM, enjoy your day.";
 // Account selection
 const char *ACCOUNTS_LIST     = "Select account type";
 
-const char *ACCOUNTS_TYPE[3]  = {"Savings Account", "Loan Account", "Credit Card Account"};
+const char *ACCOUNTS_TYPE[3]  = {\
+"Savings Account",\
+"Loan Account",\
+"Credit Card Account"};
 
 const char *ACCOUNTS_TRANSFER = "Select destination account";
 
@@ -83,16 +86,15 @@ const char *HISTORY_NONE     = "No transactions have occured yet";
 
 // Amount entering
 const char *AMOUNT_TRANSACTION[3] = {\
-"Enter the amount to deposit or 'c' to cancel:",\
-"Enter the amount to withdraw or 'c' to cancel:",\
-"Enter the amount to transfer or 'c' to cancel:"};
+"Enter the amount to deposit or 'c' to cancel: $",\
+"Enter the amount to withdraw or 'c' to cancel: $",\
+"Enter the amount to transfer or 'c' to cancel: $"};
 
 // Result screens
-const char *RESULT_WITHDRAW  = "Withdrawal successful, account balance is:";
-
-const char *RESULT_DEPOSIT   = "Deposit successful, account balance is:";
-
-const char *RESULT_TRANSFER  = "Transfer successful\nFrom account balance is:";
+const char *RESULT_TRANSACTION[3]  = {\
+"Deposit successful, account balance is:",\
+"Withdrawal successful, account balance is:",\
+"Transfer successful\nFrom account balance is:"};
 
 const char *RESULT_RECEIVING = "To account balance is:";
 

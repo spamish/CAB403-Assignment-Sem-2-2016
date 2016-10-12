@@ -16,6 +16,7 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <math.h>
 
 #define DEFAULT_PORT    12345
 #define BACKLOG         1
@@ -28,18 +29,19 @@
 #define FALSE           0
 #define FIN             0
 #define ARGS            10
+#define FAIL            1
 
 #define LOGIN           1
 #define ACCOUNTS        2
 #define TRANSFER        3
-#define BALANCE         4
-#define HISTORY         5
+#define HISTORY         4
+#define FINISH          5
 #define EXIT            6
-#define FINISH          7
 
 #define SAVE            11
 #define LOAN            12
 #define CRED            13
+#define SCALE           11
 
 #define BALA            1
 #define DEPO            2
@@ -81,6 +83,6 @@ typedef struct
 {
     char from[9];
     char to[9];
-    char trantype[2];
+    char type[2];
     double amount;
 } DB_TRANSACTION;
