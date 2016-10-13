@@ -23,7 +23,7 @@ int client_actions(int id);
  *  @param 
  *  @return 
  */
-void handler(char *sen, char *rec);
+void handler(char *sen, char *rec, int id);
 
 /*  @brief 
  *  @param 
@@ -36,6 +36,18 @@ void extract_variables(char *var, char *str, char *rem);
  *  @return 
  */
 int authenticate_client(char *username, char *password);
+
+/*  @brief 
+ *  @param 
+ *  @return 
+ */
+int process_transaction(char *accfrom, char *accto, char type, double amount, int ret);
+
+/*  @brief 
+ *  @param 
+ *  @return 
+ */
+void send_transactions(int id, char *account, int amount, char *loc);
 
 /*  @brief Interrupt handler for CTRL C
  *  @param dummy Dummy variable.

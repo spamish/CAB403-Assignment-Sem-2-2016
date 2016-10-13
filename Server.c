@@ -32,6 +32,7 @@ int main(int argc, char *argv[])
     
     // setup interrupt handler
     signal(SIGINT, interrupt);
+    printf("Creating database\n");
     
     // Authentication.txt
     file = fopen("./Authentication.txt", "r");
@@ -51,7 +52,7 @@ int main(int argc, char *argv[])
                     db_auth[i].username, \
                     db_auth[i].password, \
                     dummy);
-            sprintf(db_auth[i].client, "%s%c", dummy, '\n');
+            sprintf(db_auth[i].client, "%s%c", dummy, '\0');
         }
         else
         {
@@ -63,7 +64,6 @@ int main(int argc, char *argv[])
     }
     
     fclose(file);
-    printf("number of lines in Authentication.txt = %d\n", ln_auth);
     
     // Accounts.txt
     file = fopen("./Accounts.txt", "r");
@@ -85,7 +85,6 @@ int main(int argc, char *argv[])
     }
     
     fclose(file);
-    printf("number of lines in Accounts.txt = %d\n", ln_acc);
     
     // Client_Details.txt
     file = fopen("./Client_Details.txt", "r");
@@ -120,11 +119,11 @@ int main(int argc, char *argv[])
     }
     
     fclose(file);
-    printf("number of lines in Client_Details.txt = %d\n", ln_cli);
     
     // Transactions.txt
     file = fopen("./Transactions.txt", "r");
     ln_tran = get_lines(file) - 1;
+    
     if (ln_tran > 0)
     {
         fseek(file, 0, SEEK_SET);
@@ -134,18 +133,19 @@ int main(int argc, char *argv[])
         for (int i = 0; i < ln_tran; i++)
         {
             fgets(dummy, BUFFSIZE, file);
-            sscanf(dummy, "%s %s %d %s ", \
+            sscanf(dummy, "%s %s %s %s ", \
                     db_tran[i].from, \
                     db_tran[i].to, \
-                    db_tran[i].type, \
-                    op);
+                    op, \
+                    cl);
             
-            db_tran[i].amount = atof(op);
+            db_tran[i].type = op[0];
+            db_tran[i].amount = atof(cl);
         }
     }
     
     fclose(file);
-    printf("number of lines in Transactions.txt = %d\n", ln_tran);
+    printf("Starting server\n");
     
     // make the socket
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == ERROR)
@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
             continue;
         }
         
-        sprintf(buffer, "%d", conn);
+        sprintf(buffer, "%d%c", conn, '\0');
         
         // send id to user for future expansion and confirmation
         if (send(conn, buffer, strlen(buffer), 0) == ERROR)
@@ -200,12 +200,12 @@ int main(int argc, char *argv[])
             continue;
         }
         
-        printf("Client connected, id: %d\n", conn);
+        printf("Client connected\n");
         
         // client connected and doing shit
         while(client_actions(conn)) {}
         
-        printf("Disconnecting client, id: %d\n", conn);
+        printf("Disconnecting client\n");
         
         // close client connection
         close(conn);
@@ -247,54 +247,52 @@ int client_actions(int id)
     int num;
     char rec[BUFFSIZE];
     char sen[BUFFSIZE];
-    // BUFFERS!
-    memset(rec, '\0', BUFFSIZE);
-    memset(sen, '\0', BUFFSIZE);
     
     // retreive client instruction
-    if ((num = read(id, rec, BUFFSIZE)) > FIN)
+    if ((num = read(id, rec, BUFFSIZE)) > FALSE)
     {
         rec[num] = '\0';
     }
     
-    if (num <= FIN)
+    if (num <= FALSE)
     {
         printf("Problem receiving instruction\n");
         return FALSE;
     }
     
-    printf("ins: %s, siz: %d\n", rec, strlen(rec));
+    //printf("\tins: %s, siz: %d\n", rec, strlen(rec));
     
     // command goes off for processing
-    handler(sen, rec);
+    handler(sen, rec, id);
     
-    printf("rep: %s, siz: %d\n", sen, strlen(sen));
-    
-    // send response (might change to within handler)
-    if (send(id, sen, strlen(sen), 0) == ERROR)
+    if (strlen(sen) > 0)
     {
-        perror("Problem sending response");
-        return FALSE;
+        //printf("\tres: %s, siz: %d\n", sen, strlen(sen));
+        
+        // send response (might change to within handler)
+        if (send(id, sen, strlen(sen), 0) == ERROR)
+        {
+            perror("Problem sending response");
+            return FALSE;
+        }
+        
+        // check if pass or fail received
+        sprintf(rec, "%d%c", EXIT, '\0');
+        if (!strcmp(sen, rec))
+        {
+            return FALSE;
+        }
     }
     
-    // check if pass or fail received
-    sprintf(rec, "%d", EXIT);
-    if (!strcmp(sen, rec))
-    {
-        return FALSE;
-    }
-    
-    // nothing fucked up, wait for more from client
     return TRUE;
 }
 
-void handler(char *sen, char *rec)
+void handler(char *sen, char *rec, int id)
 {
     size_t siz;
-    int lookup, args = ARGS, prog = 0;
-    char **arguments = malloc(sizeof(*arguments)*args);
-    memset(arguments, '\0', sizeof(*arguments)*args);
-    memset(sen, '\0', BUFFSIZE);
+    int lookup = TRUE, arguments = ARGS, prog = 0;
+    char *temp, **args = malloc(sizeof(*args)*arguments);
+    memset(args, '\0', sizeof(*args)*arguments);
     
     switch (rec[prog++] - PAD)
     {
@@ -303,29 +301,29 @@ void handler(char *sen, char *rec)
         // @return firstname lastname client accounts[3]
         // @fail exit
         {
-            args = 2;
+            arguments = 2;
             lookup = ERROR;
             
             // retrieve username
             siz = (rec[prog++] - PAD) * sizeof(char);
-            arguments[0] = (char *) malloc(siz);
-            memcpy(arguments[0], &rec[prog], siz);
-            arguments[0][siz] = '\0';
+            args[0] = (char *) malloc(siz);
+            memcpy(args[0], &rec[prog], siz);
+            args[0][siz] = '\0';
             prog += siz;
             
             // retrieve password
             siz = (rec[prog++] - PAD) * sizeof(char);
-            arguments[1] = (char *) malloc(siz);
-            memcpy(arguments[1], &rec[prog], siz);
-            arguments[1][siz] = '\0';
+            args[1] = (char *) malloc(siz);
+            memcpy(args[1], &rec[prog], siz);
+            args[1][siz] = '\0';
             prog += siz;
             
             // check username and password
             for (int i = 0; i < ln_auth; i++)
             {
-                if (!strcmp(arguments[0], db_auth[i].username))
+                if (!strcmp(args[0], db_auth[i].username))
                 {
-                    if (!strcmp(arguments[1], db_auth[i].password))
+                    if (!strcmp(args[1], db_auth[i].password))
                     {
                         lookup = i;
                     }
@@ -337,7 +335,7 @@ void handler(char *sen, char *rec)
             // @todo check username and password
             if (lookup == ERROR)
             {
-                sprintf(sen, "%c", EXIT + PAD);
+                sprintf(sen, "%c%d%c", EXIT + PAD, FALSE, '\0');
                 return;
             }
             
@@ -350,7 +348,7 @@ void handler(char *sen, char *rec)
                 }
             }
 
-            sprintf(sen, "%c%s%c%s%c%s%c%s%c%s%c%s", \
+            sprintf(sen, "%c%s%c%s%c%s%c%s%c%s%c%s%c", \
                     strlen(db_cli[lookup].firstname) + PAD, \
                     db_cli[lookup].firstname, \
                     strlen(db_cli[lookup].lastname) + PAD, \
@@ -362,7 +360,7 @@ void handler(char *sen, char *rec)
                     strlen(db_cli[lookup].accounts[1]) + PAD, \
                     db_cli[lookup].accounts[1], \
                     strlen(db_cli[lookup].accounts[2]) + PAD, \
-                    db_cli[lookup].accounts[2]);
+                    db_cli[lookup].accounts[2], '\0');
             
             break;
         }
@@ -372,20 +370,20 @@ void handler(char *sen, char *rec)
         // @return number opening closing
         // @fail return '0'
         {
-            args = 3;
+            arguments = 3;
             lookup = ERROR;
             
             // retrieve account
             siz = (rec[prog++] - PAD) * sizeof(char);
-            arguments[0] = (char *) malloc(siz);
-            memcpy(arguments[0], &rec[prog], siz);
-            arguments[0][siz] = '\0';
+            args[0] = (char *) malloc(siz);
+            memcpy(args[0], &rec[prog], siz);
+            args[0][siz] = '\0';
             prog += siz;
             
             // check account
             for (int i = 0; i < ln_acc; i++)
             {
-                if (!strcmp(arguments[0], db_acc[i].number))
+                if (!strcmp(args[0], db_acc[i].number))
                 {
                     lookup = i;
                     break;
@@ -394,55 +392,190 @@ void handler(char *sen, char *rec)
             
             if (lookup == ERROR)
             {
-                sprintf(sen, "%c%d", FAIL + PAD, FALSE);
+                sprintf(sen, "%c%d%c", FAIL + PAD, FALSE, '\0');
                 return;
             }
             
             // initialise memory for balances
-            arguments[1] = (char *) malloc(INPUTSIZE);
-            arguments[2] = (char *) malloc(INPUTSIZE);
+            args[1] = (char *) malloc(INPUTSIZE);
+            args[2] = (char *) malloc(INPUTSIZE);
             
             // get strings of balances
-            sprintf(arguments[1], "%.2f%c", db_acc[lookup].opening, '\0');
-            sprintf(arguments[2], "%.2f%c", db_acc[lookup].closing, '\0');
+            sprintf(args[1], "%.2f%c", db_acc[lookup].opening, '\0');
+            sprintf(args[2], "%.2f%c", db_acc[lookup].closing, '\0');
             
-            sprintf(sen, "%c%s%c%s%c%s%c%s%c%s%c%s", \
+            sprintf(sen, "%c%s%c%s%c%s%c%s%c%s%c%s%c", \
                     strlen(db_acc[lookup].number) + PAD, \
                     db_acc[lookup].number, \
-                    strlen(arguments[1]) + PAD, \
-                    arguments[1], \
-                    strlen(arguments[2]) + PAD, \
-                    arguments[2]);
+                    strlen(args[1]) + PAD, \
+                    args[1], \
+                    strlen(args[2]) + PAD, \
+                    args[2], '\0');
             
             break;
         }
         
+        case EXTERNAL:
+            lookup = FALSE;
         case TRANSFER:
-        // @param 
-        // @return 
+        // @param from to type amount
+        // @return (EXTERNAL closing or TRANSFER from.closing to.closing)
+        // @fail return (EXTERNAL or TRANSFER) '0'
         {
+            arguments = 4;
             
-            // @todo check account number
-            sprintf(sen, "%c", TRANSFER + PAD);
+            // retrieve from
+            siz = (rec[prog++] - PAD) * sizeof(char);
+            args[0] = (char *) malloc(siz);
+            memcpy(args[0], &rec[prog], siz);
+            args[0][siz] = '\0';
+            prog += siz;
+            
+            // retrieve to
+            siz = (rec[prog++] - PAD) * sizeof(char);
+            args[1] = (char *) malloc(siz);
+            memcpy(args[1], &rec[prog], siz);
+            args[1][siz] = '\0';
+            prog += siz;
+            
+            // retrieve type
+            siz = (rec[prog++] - PAD) * sizeof(char);
+            args[2] = (char *) malloc(siz);
+            memcpy(args[2], &rec[prog], siz);
+            args[2][siz] = '\0';
+            prog += siz;
+            
+            // retrieve amount
+            siz = (rec[prog++] - PAD) * sizeof(char);
+            args[3] = (char *) malloc(siz);
+            memcpy(args[3], &rec[prog], siz);
+            args[3][siz] = '\0';
+            prog += siz;
+            
+            prog = process_transaction( \
+                    args[0], \
+                    args[1], \
+                    args[2][0], \
+                    atof(args[3]), \
+                    lookup);
+            
+            if (prog != TRUE)
+            {
+                sprintf(sen, "%c%c%c", prog + PAD, FAIL + PAD, '\0');
+                
+                return;
+            }
+            
+            if ((temp = realloc(args[2], INPUTSIZE)) == NULL)
+            {
+                printf("Cannot allocate more memory.\n");
+                return;
+            }
+            else
+            {
+                args[2] = temp;
+            }
+            
+            if ((temp = realloc(args[3], INPUTSIZE)) == NULL)
+            {
+                printf("Cannot allocate more memory.\n");
+                return;
+            }
+            else
+            {
+                args[3] = temp;
+            }
+            
+            for (int i = 0; i < ln_acc; i++)
+            {
+                if (!strcmp(args[0], db_acc[i].number))
+                {
+                    sprintf(args[2], "%.2f%c", db_acc[i].closing, '\0');
+                    break;
+                }
+            }
+            
+            for (int i = 0; i < ln_acc; i++)
+            {
+                if (!strcmp(args[1], db_acc[i].number))
+                {
+                    sprintf(args[3], "%.2f%c", db_acc[i].closing, '\0');
+                    break;
+                }
+            }
+            
+            if ((temp = realloc(args[0], sizeof(char))) == NULL)
+            {
+                printf("Cannot allocate more memory.\n");
+                return;
+            }
+            else
+            {
+                args[0] = temp;
+            }
+            
+            if (lookup)
+            {
+                args[0][0] = TRANSFER + PAD;
+                sprintf(sen, "%c%c%s%c%s%c", \
+                        args[0][0], \
+                        strlen(args[2]) + PAD, \
+                        args[2], \
+                        strlen(args[3]) + PAD, \
+                        args[3], '\0');
+            }
+            else
+            {
+                args[0][0] = EXTERNAL + PAD;
+                sprintf(sen, "%c%c%s%c%s%c", \
+                        args[0][0], \
+                        strlen(args[2]) + PAD, \
+                        args[2], \
+                        1 + PAD, \
+                        "0", '\0');
+            }
+            
             break;
         }
         
         case HISTORY:
-        // @param accountno
-        // @return array size array[fromaccount toaccount type amount]
+        // @param account
+        // @return array size opening closing
+        // @loop fromaccount toaccount type amount
         {
+            arguments = 2;
             
-            sprintf(sen, "%c", HISTORY + PAD);
-            break;
-        }
-        
-        case FINISH:
-        // @param 
-        // @return finish
-        {
+            // retrieve account
+            siz = (rec[prog++] - PAD) * sizeof(char);
+            args[0] = (char *) malloc(siz);
+            memcpy(args[0], &rec[prog], siz);
+            args[0][siz] = '\0';
+            prog = 0;
             
-            // @todo move transaction from temporary to permanent data
-            sprintf(sen, "%c", FINISH + PAD);
+            // find transactions
+            if (ln_tran > 0)
+            {
+                args[1] = (char *) malloc(ln_tran * 2);
+                
+                for (int i = 0; i < ln_tran; i++)
+                {
+                    // deposits withdrawals and transactions from
+                    if (!strcmp(args[0], db_tran[i].from))
+                    {
+                        args[1][prog++] = i;
+                    }
+                    
+                    // transactions to
+                    if (!strcmp(args[0], db_tran[i].to) && (db_tran[i].type == TRAN))
+                    {
+                        args[1][prog++] = i;
+                    }
+                }
+            }
+            
+            send_transactions(id, args[0], prog, args[1]);
+            memset(sen, '\0', BUFFSIZE);
+            
             break;
         }
         
@@ -450,17 +583,16 @@ void handler(char *sen, char *rec)
         // @param exit
         // @return exit
         {
-            
-            sprintf(sen, "%c\0", EXIT + PAD);
+            sprintf(sen, "%c%d%c", EXIT + PAD, FALSE, '\0');
             break;
         }
     }
     
-    for (int i = 0; i < args; i++)
+    for (int i = 0; i < arguments; i++)
     {
-        free(arguments[i]);
+        free(args[i]);
     }
-    free(arguments);
+    free(args);
 }
 
 int authenticate_client(char *username, char *password)
@@ -481,6 +613,162 @@ int authenticate_client(char *username, char *password)
     }
     
     return TRUE;
+}
+
+int process_transaction(char *accfrom, char *accto, char type, double amount, int ret)
+{
+    double buffer = 0.0f;
+    DB_ACCOUNT *account;
+    DB_TRANSACTION *temp;
+    int from, to;
+    
+    // check above max amount
+    if ((type == DEPO) && (amount > MAX_DEPOSIT))
+    {
+        return TRANSFER;
+    }
+    
+    // assign from account
+    for (int i = 0; i < ln_acc; i++)
+    {
+        if (!strcmp(accfrom, db_acc[i].number))
+        {
+            account = malloc(sizeof(DB_ACCOUNT));
+            memcpy(account[0].number, db_acc[i].number, strlen(accfrom));
+            account[0].closing = db_acc[i].closing;
+            from = i;
+            
+            break;
+        }
+    }
+    
+    if (type != DEPO)
+    {
+        // max limit for credit cards
+        if (!(atoi(account[0].number) % CRED))
+        {
+            buffer = MAX_LIMIT;
+        }
+        
+        // check balance
+        if (amount > (account[0].closing + buffer))
+        {
+            free(account);
+            return EXTERNAL;
+        }
+    }
+    
+    // assign to account
+    for (int i = 0; i < ln_acc; i++)
+    {
+        if (!strcmp(accto, db_acc[i].number))
+        {
+            to = i;
+            break;
+        }
+    }
+    
+    // process transaction
+    if ((temp = realloc(db_tran, sizeof(DB_TRANSACTION) * (ln_tran + 1))) == NULL)
+    {
+        printf("Cannot allocate more memory.\n");
+        return FALSE;
+    }
+    else
+    {
+        db_tran = temp;
+        memset(&db_tran[ln_tran], '\0', sizeof(DB_TRANSACTION));
+    }
+    
+    memcpy(db_tran[ln_tran].from, accfrom, sizeof(accfrom));
+    memcpy(db_tran[ln_tran].to, accto, sizeof(accto));
+    db_tran[ln_tran].type = type;
+    
+    // update balances
+    switch (type)
+    {
+        case DEPO:
+            db_tran[ln_tran].amount = -amount;
+            db_acc[from].closing += amount;
+            
+            break;
+        
+        case WITH:
+            db_tran[ln_tran].amount = amount;
+            db_acc[from].closing -= amount;
+            
+            break;
+        
+        case TRAN:
+            db_tran[ln_tran].amount = -amount;
+            db_acc[from].closing -= amount;
+            db_acc[to].closing += amount;
+            
+            break;
+    }
+    
+    ln_tran++;
+    free(account);
+    return TRUE;
+}
+
+void send_transactions(int id, char *account, int count, char *loc)
+{
+    int num;
+    char rec[BUFFSIZE], \
+            sen[BUFFSIZE], \
+            opening[INPUTSIZE], \
+            closing[INPUTSIZE];
+    
+    // check account
+    for (int i = 0; i < ln_acc; i++)
+    {
+        if (!strcmp(account, db_acc[i].number))
+        {
+            num = i;
+            break;
+        }
+    }
+    
+    // get strings of balances
+    sprintf(opening, "%.2f%c", db_acc[num].opening, '\0');
+    sprintf(closing, "%.2f%c", db_acc[num].closing, '\0');
+    
+    sprintf(sen, "%c%c%c%s%c%s%c", \
+            1 + PAD, \
+            count + PAD, \
+            strlen(opening) + PAD, \
+            opening, \
+            strlen(closing) + PAD, \
+            closing, '\0');
+    
+    // send account balance and count
+    if (send(id, sen, strlen(sen), 0) == ERROR)
+    {
+        perror("Problem sending response");
+        return;
+    }
+    
+    if (count > 0)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            read(id, rec, BUFFSIZE);
+            sprintf(rec, "%.2f%c", db_tran[loc[i]].amount, '\0');
+            
+            sprintf(sen, "%c%s%c%s%c%c%c%s", \
+                    strlen(db_tran[loc[i]].from) + PAD, \
+                    db_tran[loc[i]].from, \
+                    strlen(db_tran[loc[i]].to) + PAD, \
+                    db_tran[loc[i]].to, \
+                    1 + PAD, \
+                    db_tran[loc[i]].type, \
+                    strlen(rec) + PAD, \
+                    rec, '\0');
+            
+            send(id, sen, strlen(sen), 0);
+        }
+    }
 }
 
 void interrupt(int dummy)
@@ -536,6 +824,8 @@ void interrupt(int dummy)
                 db_acc[i].closing);
     }
     
+    // @todo sort transactions
+    
     // Transactions.txt
     if (ln_tran)
     {
@@ -548,7 +838,7 @@ void interrupt(int dummy)
             fprintf(file, "%-15s%10s%12c%14.2f\n", \
                     db_tran[i].from, \
                     db_tran[i].to, \
-                    db_tran[i].type[0], \
+                    db_tran[i].type, \
                     db_tran[i].amount);
         }
     }

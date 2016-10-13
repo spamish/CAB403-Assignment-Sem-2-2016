@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in conn_addr;
     struct hostent *ip_address;
     char message[BUFFSIZE], reply[BUFFSIZE];
-    client = malloc(sizeof(DB_CLIENT) * 1);
+    client = malloc(sizeof(DB_CLIENT));
     
     // check input parameters
     if (argc != 3)
@@ -52,12 +52,12 @@ int main(int argc, char *argv[])
     }
     
     // get id
-    if ((numbytes = read(conn, reply, BUFFSIZE)) > FIN)
+    if ((numbytes = read(conn, reply, BUFFSIZE)) > 0)
     {
         reply[BUFFSIZE] = '\0';
     }
     
-    if (numbytes <= FIN)
+    if (numbytes <= 0)
     {
         printf("Problem receiving id\n");
         exit(1);
@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     
     // communication confirmed
     id = atoi(reply);
-    printf("Connected to server with id: %d\n\n%s\n\n", id, MISC_SEPARATE);
+    printf("Connected to server\n\n%s\n\n", MISC_SEPARATE);
     
     // welcome screen and login
     if (welcome_login(conn))
@@ -100,6 +100,8 @@ int welcome_login(int sock)
     
     memset(message, '\0', BUFFSIZE);
     memset(reply, '\0', BUFFSIZE);
+    memset(username, '\0', BUFFSIZE);
+    memset(password, '\0', BUFFSIZE);
     memset(input, '\0', INPUTSIZE);
     
     // enter username
@@ -114,20 +116,19 @@ int welcome_login(int sock)
     memcpy(password, input, strlen(input) - 1);
     
     // compile message
-    sprintf(message, "%c%c%s%c%s", LOGIN + PAD, \
+    sprintf(message, "%c%c%s%c%s%c", LOGIN + PAD, \
             strlen(username) + PAD, username, \
-            strlen(password) + PAD, password);
+            strlen(password) + PAD, password, '\0');
     
     // communicate with server
-    if(talking(sock, message, reply) == ERROR)
+    if(talking(sock, message, reply) == FIN)
     {
         printf("Problem logging in\n");
         exit(1);
     }
     
     // check if pass or fail received
-    sprintf(message, "%d", EXIT);
-    if (!strcmp(reply, message))
+    if ((reply[0] == (EXIT + PAD)) && (reply[1] == (FALSE + PAD)))
     {
         return TRUE;
     }
@@ -174,32 +175,32 @@ int talking(int sock, char *sen, char *rec)
     // send message
     if (send(sock, sen, strlen(sen), 0) == ERROR)
     {
-        perror("Problem sending response");
-        return FALSE;
+        printf("Problem sending message, logging out\n\n");
+        return FIN;
     }
     
-    printf("mess: %s, siz: %d\n", sen, strlen(sen));
+    //printf("\tsen: %s\n", sen);
     
     // read response
-    if ((num = read(sock, rec, BUFFSIZE)) > FIN)
+    if ((num = read(sock, rec, BUFFSIZE)) > 0)
     {
         rec[BUFFSIZE] = '\0';
-        printf("rec: %s, siz: %d\n", rec, strlen(rec));
     }
     
     // check if response is bullshit
-    if (num <= FIN)
+    if (num <= 0)
     {
-        printf("Problem receiving response");
-        return FALSE;
+        printf("Problem receiving response, logging out\n\n");
+        return FIN;
     }
+    
+    //printf("\trec: %s\n", rec);
     
     return TRUE;
 }
 
 int auto_mach_tell(int sock)
 {
-    int sel;
     char input[INPUTSIZE], selection[INPUTSIZE], \
             message[BUFFSIZE], reply[BUFFSIZE];
     
@@ -215,31 +216,51 @@ int auto_mach_tell(int sock)
     printf("\n%s\n\n", MISC_SEPARATE);
     
     // @todo select option from main menu
-    switch(atoi(input))
+    switch((char) (atoi(input) + PAD))
     {
         case BALA: // balance
-            sel = bala_hist(sock, BALA);
+            if (balance(sock) == FIN)
+            {
+                return FALSE;
+            }
+            
             break;
         
         case DEPO: // deposit
-            with_depo_tran(sock, DEPO);
+            if (with_depo_tran(sock, DEPO) == FIN)
+            {
+                return FALSE;
+            }
+            
             break;
         
         case WITH: // withdrawal
-            with_depo_tran(sock, WITH);
+            if (with_depo_tran(sock, WITH) == FIN)
+            {
+                return FALSE;
+            }
+            
             break;
         
         case TRAN: // transfer
-            with_depo_tran(sock, TRAN);
+            if (with_depo_tran(sock, TRAN) == FIN)
+            {
+                return FALSE;
+            }
+            
             break;
         
         case HIST: // history
-            bala_hist(sock, HIST);
+            if (history(sock) == FIN)
+            {
+                return FALSE;
+            }
+            
             break;
         
-        case EXIT:
+        case (EXIT + PAD):
             //return exit
-            sprintf(message, "%c", EXIT + PAD);
+            sprintf(message, "%c%d%c", EXIT + PAD, FALSE, '\0');
             
             // communicate with server
             talking(sock, message, reply);
@@ -252,10 +273,11 @@ int auto_mach_tell(int sock)
     return TRUE;
 }
 
-int with_depo_tran(int sock, int type)
+int with_depo_tran(int sock, char type)
 {
-    int sel, cont = FALSE, prog = 0, ext = FALSE, dep = FALSE;
-    char from[INPUTSIZE], \
+    int sel, cont, prog = 0, ext = FALSE, dep = FALSE;
+    char resp, \
+            from[INPUTSIZE], \
             to[INPUTSIZE], \
             input[INPUTSIZE], \
             dummy[INPUTSIZE], \
@@ -263,7 +285,7 @@ int with_depo_tran(int sock, int type)
             reply[BUFFSIZE];
     double amount;
     size_t siz;
-    DB_ACCOUNT *account = malloc(sizeof(DB_ACCOUNT) * 1);
+    DB_ACCOUNT *account = malloc(sizeof(DB_ACCOUNT));
     
     memset(from, '\0', INPUTSIZE);
     memset(to, '\0', INPUTSIZE);
@@ -271,7 +293,8 @@ int with_depo_tran(int sock, int type)
     memset(dummy, '\0', INPUTSIZE);
     
     // select from account
-    while (TRUE)
+    cont = TRUE;
+    while (cont)
     {
         if (type == DEPO)
         {
@@ -282,9 +305,14 @@ int with_depo_tran(int sock, int type)
         
         if (sel == FIN)
         {
+            return FIN;
+        }
+        
+        if (sel == FALSE)
+        {
             // cancel
             printf("\n%s\n\n%s\n\n", MISC_RETURN, MISC_SEPARATE);
-            return FIN;
+            return FALSE;
         }
         
         if (sel != ERROR)
@@ -296,110 +324,266 @@ int with_depo_tran(int sock, int type)
                     memcpy(from, \
                             client[0].accounts[i], \
                             sizeof(client[0].accounts[i]));
-                    break;
+                    cont = FALSE;
                 }
             }
-            
-            break;
         }
         
         // invalid selection
-        printf("\n%s\n\n", MISC_FAIL);
+        if (cont)
+        {
+            printf("\n%s\n\n", MISC_FAIL);
+        }
     }
+    
+    printf("\n");
     
     // select to account
     if (type == TRAN)
     {
-        while (TRUE)
+        cont = TRUE;
+        while (cont)
         {
             sel = select_account(sock, TRUE, TRUE, account);
             
             if (sel == FIN)
             {
-                // cancel
-                printf("\n%s\n\n%s\n\n", MISC_RETURN, MISC_SEPARATE);
                 return FIN;
             }
             
-            if (sel != ERROR)
+            if (sel == FALSE)
             {
-                for (int i = 0; i < 3; i++)
-                {
-                    if (!(atoi(client[0].accounts[i]) % sel))
-                    {
-                        if (!strcmp(client[0].accounts[i], from))
-                        {
-                            printf("\n%s\n\n", MISC_FAIL);
-                            continue;
-                        }
-                        
-                        memcpy(to, \
-                                client[0].accounts[i], \
-                                sizeof(client[0].accounts[i]));
-                        break;
-                    }
-                }
-                
-                break;
+                // cancel
+                printf("\n%s\n\n%s\n\n", MISC_RETURN, MISC_SEPARATE);
+                return FALSE;
             }
             
-            // invalid selection
-            printf("\n%s\n\n", MISC_FAIL);
+            if (sel == TRUE)
+            {
+                memcpy(to, account, sizeof(account));
+                cont = FALSE;
+            }
+            else
+            {
+                if (sel != ERROR)
+                {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        if (!(atoi(client[0].accounts[i]) % sel))
+                        {
+                            if (!strcmp(client[0].accounts[i], from))
+                            {
+                                printf("\n%s\n\n", MISC_FAIL);
+                                continue;
+                            }
+                            
+                            memcpy(to, \
+                                    client[0].accounts[i], \
+                                    sizeof(client[0].accounts[i]));
+                            sel = FALSE;
+                            cont = FALSE;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (cont)
+            {
+                // invalid selection
+                printf("\n%s\n\n", MISC_FAIL);
+            }
         }
+        
+        printf("\n");
     }
     else
     {
         memcpy(to, from, sizeof(from));
     }
     
-    // request amount
-    memset(dummy, '\0', INPUTSIZE);
-    printf("\n%s", AMOUNT_TRANSACTION[type - 2]);
-    fgets(input, INPUTSIZE, stdin);
-    memcpy(dummy, input, strlen(input) - 1);
-    amount = atof(dummy);
+    cont = TRUE;
+    while(cont)
+    {
+        // request amount
+        switch (type)
+        {
+            case DEPO:
+                printf("%s", AMOUNT_DEPOSIT);
+                break;
+            case WITH:
+                printf("%s", AMOUNT_WITHDRAWAL);
+                break;
+            case TRAN:
+                printf("%s", AMOUNT_TRANSFER);
+                break;
+        }
+        
+        fgets(input, INPUTSIZE, stdin);
+        memset(dummy, '\0', INPUTSIZE);
+        memcpy(dummy, input, strlen(input) - 1);
+        
+        // cancel
+        if ((CANCEL == dummy[0]) && (strlen(dummy) == 1))
+        {
+            printf("\n%s\n\n%s\n\n", MISC_RETURN, MISC_SEPARATE);
+            return FALSE;
+        }
+        
+        // format amount
+        amount = atof(dummy);
+        
+        if (amount > 0.0)
+        {
+            sprintf(dummy, "%.2f%c", amount, '\0');
+            
+            // compile message
+            if (sel)
+            {
+                sprintf(message, "%c%c%s%c%s%c%c%c%s%c", EXTERNAL + PAD, \
+                        strlen(from) + PAD, \
+                        from, \
+                        strlen(to) + PAD, \
+                        to, \
+                        sizeof(type) + PAD, \
+                        type, \
+                        strlen(dummy) + PAD, \
+                        dummy, '\0');
+            }
+            else
+            {
+                sprintf(message, "%c%c%s%c%s%c%c%c%s%c", TRANSFER + PAD, \
+                        strlen(from) + PAD, \
+                        from, \
+                        strlen(to) + PAD, \
+                        to, \
+                        sizeof(type) + PAD, \
+                        type, \
+                        strlen(dummy) + PAD, \
+                        dummy, '\0');
+            }
+            
+            // communicate with server
+            if (talking(sock, message, reply) == FIN)
+            {
+                return FIN;
+            }
+            
+            prog = 0;
+            resp = reply[prog++] - PAD;
+            
+            if ((reply[0] == (FAIL + PAD)) && (reply[1] == (FALSE + PAD)))
+            {
+                switch (resp)
+                {
+                    case TRANSFER:
+                        printf("\n%s\n", ERROR_LOADED);
+                        break;
+                    
+                    case EXTERNAL:
+                        printf("\n%s\n", ERROR_BROKE);
+                        break;
+                }
+            }
+            else
+            {
+                cont = FALSE;
+            }
+        }
+        else
+        {
+            // invalid selection
+            printf("\n%s\n\n", ERROR_AMOUNT);
+        }
+    }
     
-    // format amount
-    memset(dummy, '\0', INPUTSIZE);
-    sprintf(dummy, "%.2f", amount);
-    printf("from: %s, to: %s, type: %d, amount: %s\n", from, to, type, dummy);
-    
-    // compile message
-    sprintf(message, "%c%c%s%c%s", TRANSFER + PAD, \
-            strlen(from) + PAD, \
-            from, \
-            strlen(to) + PAD, \
-            to);
-    
-    // communicate with server
-    talking(sock, message, reply);
+    printf("\n%s\n", MISC_SEPARATE);
     
     // display result
-    printf("\nPrint result\n\n%s\n\n", MISC_SEPARATE);
+    switch (type)
+    {
+        case DEPO:
+            printf("\n%s ", RESULT_DEPOSIT);
+            print_money(amount, FALSE);
+            
+            break;
+        case WITH:
+            printf("\n%s ", RESULT_WITHDRAWAL);
+            print_money(amount, FALSE);
+            
+            break;
+        case TRAN:
+            printf("\n%s ", RESULT_TRANSFER);
+            print_money(amount, FALSE);
+            
+            break;
+    }
+    
+    // assign from balance
+    memset(dummy, '\0', INPUTSIZE);
+    siz = (reply[prog++] - PAD) * sizeof(char);
+    memcpy(dummy, &reply[prog], siz);
+    dummy[siz] = '\0';
+    prog += siz;
+    
+    // display from balance
+    amount = atof(dummy);
+    printf("\n%s %s is: ", RESULT_BALANCE, from);
+    print_money(amount, FALSE);
+    
+    // assign to balance
+    memset(dummy, '\0', INPUTSIZE);
+    siz = (reply[prog++] - PAD) * sizeof(char);
+    memcpy(dummy, &reply[prog], siz);
+    dummy[siz] = '\0';
+    prog += siz;
+    
+    // display to balance
+    if (type == TRAN)
+    {
+        printf("\n%s %s", RESULT_RECEIVING, to);
+        
+        if (dummy[0] != '0')
+        {
+            amount = atof(dummy);
+            printf(" is: ");
+            print_money(amount, FALSE);
+        }
+    }
+    
+    printf("\n\n%s ", MISC_CONTINUE);
+    fgets(dummy, INPUTSIZE, stdin);
+    printf("\n%s\n\n", MISC_SEPARATE);
     
     return TRUE;
 }
 
-int bala_hist(int sock, int type)
+int balance(int sock)
 {
     DB_ACCOUNT *account;
-    int sel, prog = 0;
+    int sel, num, prog = 0;
     char dummy[INPUTSIZE], message[BUFFSIZE], reply[BUFFSIZE];
     size_t siz;
     
     memset(message, '\0', BUFFSIZE);
     memset(reply, '\0', BUFFSIZE);
-    account = malloc(sizeof(DB_ACCOUNT) * 1);
+    account = malloc(sizeof(DB_ACCOUNT));
     
+    // select account
     while (TRUE)
     {
         sel = select_account(sock, TRUE, FALSE, account);
         
         if (sel == FIN)
         {
+            return FIN;
+        }
+        
+        if (sel == FALSE)
+        {
             // cancel
             printf("\n%s\n\n%s\n\n", MISC_RETURN, MISC_SEPARATE);
-            return FIN;
+            return FALSE;
         }
         
         if (sel != ERROR)
@@ -434,95 +618,224 @@ int bala_hist(int sock, int type)
         }
     }
     
-    switch (type)
+    // compile message
+    sprintf(message, "%c%c%s%c%s%c", ACCOUNTS + PAD, \
+            strlen(client[0].accounts[sel]) + PAD, \
+            client[0].accounts[sel], '\0');
+    
+    // communicate with server
+    if (talking(sock, message, reply) == FIN)
     {
-        case BALA:
-        // display account balance
+        return FIN;
+    }
+    
+    // assign account information
+    siz = (reply[prog++] - PAD) * sizeof(char);
+    memcpy(account[0].number, &reply[prog], siz);
+    account[0].number[siz] = '\0';
+    prog += siz;
+    
+    siz = (reply[prog++] - PAD) * sizeof(char);
+    memcpy(dummy, &reply[prog], siz);
+    dummy[siz] = '\0';
+    prog += siz;
+    
+    account[0].opening = atof(dummy);
+    
+    siz = (reply[prog++] - PAD) * sizeof(char);
+    memcpy(dummy, &reply[prog], siz);
+    dummy[siz] = '\0';
+    prog += siz;
+    
+    account[0].closing = atof(dummy);
+    
+    // display account balance
+    printf("%s ", BALANCE_CURRENT);
+    print_money(account[0].closing, FALSE);
+    printf("\n");
+    
+    printf("\n%s ", MISC_CONTINUE);
+    fgets(dummy, INPUTSIZE, stdin);
+    printf("\n%s\n\n", MISC_SEPARATE);
+    return TRUE;
+}
+
+int history(int sock)
+{
+    DB_ACCOUNT *account;
+    char type, from[9], to[9];
+    double amount;
+    int sel, num, prog = 0;
+    char dummy[INPUTSIZE], message[BUFFSIZE], reply[BUFFSIZE];
+    size_t siz;
+    
+    memset(message, '\0', BUFFSIZE);
+    memset(reply, '\0', BUFFSIZE);
+    account = malloc(sizeof(DB_ACCOUNT));
+    
+    // select account
+    while (TRUE)
+    {
+        sel = select_account(sock, TRUE, FALSE, account);
+        
+        if (sel == FIN)
         {
-            // compile message
-            sprintf(message, "%c%c%s%c%s", ACCOUNTS + PAD, \
-                    strlen(client[0].accounts[sel]) + PAD, \
-                    client[0].accounts[sel]);
-            
-            // communicate with server
-            talking(sock, message, reply);
-            
-            // assign account information
-            siz = (reply[prog++] - PAD) * sizeof(char);
-            memcpy(account[0].number, &reply[prog], siz);
-            account[0].number[siz] = '\0';
-            prog += siz;
-            
-            siz = (reply[prog++] - PAD) * sizeof(char);
-            memcpy(dummy, &reply[prog], siz);
-            dummy[siz] = '\0';
-            prog += siz;
-            
-            account[0].opening = atof(dummy);
-            
-            siz = (reply[prog++] - PAD) * sizeof(char);
-            memcpy(dummy, &reply[prog], siz);
-            dummy[siz] = '\0';
-            prog += siz;
-            
-            account[0].closing = atof(dummy);
-            
-            // display account balance
-            printf("%s ", BALANCE_CURRENT);
-            print_money(account[0].closing);
-            printf("\n");
-            
+            return FIN;
+        }
+        
+        if (sel == FALSE)
+        {
+            // cancel
+            printf("\n%s\n\n%s\n\n", MISC_RETURN, MISC_SEPARATE);
+            return FALSE;
+        }
+        
+        if (sel != ERROR)
+        {
             break;
         }
         
-        case HIST:
-        // @todo display transaction history
+        // invalid selection
+        printf("\n%s\n\n", MISC_FAIL);
+    }
+    
+    // display balance
+    printf("\n%s\n\n%s %s %s, %s %s\n%s", \
+            MISC_SEPARATE, BALANCE_OWNER, \
+            client[0].firstname, \
+            client[0].lastname, \
+            BALANCE_CLIENT, \
+            client[0].client, \
+            BALANCE_TYPE);
+    
+    for (int i = 0; i < 3; i++)
+    {
+        if (!(atoi(client[0].accounts[i]) % sel))
         {
-            /*// compile message
-            sprintf(message, "%c%c%s%c%s", HISTORY + PAD, \
-                    strlen(client[0].accounts[sel]) + PAD, \
-                    client[0].accounts[sel]);
-            
-            // communicate with server
-            talking(sock, message, reply);
-            
-            // assign account information
-            siz = (reply[prog++] - PAD) * sizeof(char);
-            memcpy(account[0].number, &reply[prog], siz);
-            account[0].number[siz] = '\0';
-            prog += siz;
-            
-            siz = (reply[prog++] - PAD) * sizeof(char);
-            memcpy(dummy, &reply[prog], siz);
-            dummy[siz] = '\0';
-            prog += siz;
-            
-            account[0].opening = atof(dummy);
-            
-            siz = (reply[prog++] - PAD) * sizeof(char);
-            memcpy(dummy, &reply[prog], siz);
-            dummy[siz] = '\0';
-            prog += siz;
-            
-            account[0].closing = atof(dummy);
-            
-            // display account balance
-            printf("%s ", BALANCE_CURRENT);
-            print_money(account[0].closing);
-            printf("\n");
-            
-            // display transaction listings
-            printf("%s %d\n\n%s $%.2f\n\n%s $%.2f\n", \
-                    HISTORY_TOTAL, \
-                    1, \
-                    HISTORY_OPEN, \
-                    account[0].opening, \
-                    HISTORY_CLOSE, \
-                    account[0].closing); // @todo get transaction listings
-            */
+            printf(" %s, %s %s\n\n", \
+            ACCOUNTS_TYPE[i], \
+            BALANCE_ACCOUNT, \
+            client[0].accounts[i]);
+            sel = i;
             
             break;
         }
+    }
+    
+    // compile message
+    sprintf(message, "%c%c%s%c", HISTORY + PAD, \
+            strlen(client[0].accounts[sel]) + PAD, \
+            client[0].accounts[sel], '\0');
+    
+    // communicate with server
+    if (talking(sock, message, reply) == FIN)
+    {
+        return FIN;
+    }
+    
+    // assign account information
+    siz = (reply[prog++] - PAD) * sizeof(char);
+    memcpy(dummy, &reply[prog], siz);
+    dummy[siz] = '\0';
+    prog += siz;
+    
+    num = dummy[0] - PAD;
+    
+    siz = (reply[prog++] - PAD) * sizeof(char);
+    memcpy(dummy, &reply[prog], siz);
+    dummy[siz] = '\0';
+    prog += siz;
+    
+    account[0].opening = atof(dummy);
+    
+    siz = (reply[prog++] - PAD) * sizeof(char);
+    memcpy(dummy, &reply[prog], siz);
+    dummy[siz] = '\0';
+    prog += siz;
+    
+    account[0].closing = atof(dummy);
+    
+    // display balances listings
+    printf("%s %d\n%s ", HISTORY_TOTAL, num, HISTORY_OPEN);
+    print_money(account[0].opening, FALSE);
+    printf("\n%s ", HISTORY_CLOSE);
+    print_money(account[0].closing, FALSE);
+    printf("\n");
+    
+    if (num > 0)
+    {
+        // display transactions
+        printf("\n%s\n", HISTORY_TABLE);
+        
+        for (int i = 0; i < num; i++)
+        {
+            memset(reply, '\0', BUFFSIZE);
+            sprintf(message, "%c%c%c", i + PAD, num + PAD, '\0');
+            prog = 0;
+            
+            // request next transaction
+            if (talking(sock, message, reply) == FIN)
+            {
+                return FIN;
+            }
+            
+            // retrieve from
+            siz = (reply[prog++] - PAD) * sizeof(char);
+            memcpy(from, &reply[prog], siz);
+            from[siz] = '\0';
+            prog += siz;
+            
+            // retrieve to
+            siz = (reply[prog++] - PAD) * sizeof(char);
+            memcpy(to, &reply[prog], siz);
+            to[siz] = '\0';
+            prog += siz;
+            
+            // retrieve type
+            siz = (reply[prog++] - PAD) * sizeof(char);
+            type = reply[prog++];
+            
+            // retrieve amount
+            siz = (reply[prog++] - PAD) * sizeof(char);
+            memcpy(dummy, &reply[prog], siz);
+            dummy[siz] = '\0';
+            prog += siz;
+            
+            amount = atof(dummy);
+            
+            switch (type)
+            {
+                case DEPO:
+                    printf("%6d%20s", i + 1, HISTORY_DEPOSIT);
+                    print_money(-amount, TRUE);
+                    break;
+                
+                case WITH:
+                    printf("%6d%20s", i + 1, HISTORY_WITHDRAW);
+                    print_money(-amount, TRUE);
+                    break;
+                
+                case TRAN:
+                    printf("%6d%20s", i + 1, HISTORY_TRANSFER);
+                    
+                    if (strcmp(client[0].accounts[sel], from))
+                    {
+                        print_money(-amount, TRUE);
+                    }
+                    else
+                    {
+                        print_money(amount, TRUE);
+                    }
+                    
+                    break;
+            }
+            
+            printf("\n");
+        }
+    }
+    else
+    {
+        printf("\n%s\n", HISTORY_NONE);
     }
     
     printf("\n%s ", MISC_CONTINUE);
@@ -542,9 +855,17 @@ int select_account(int sock, int stage, int ext, DB_ACCOUNT *account)
     
     memset(input, '\0', INPUTSIZE);
     memset(dummy, '\0', INPUTSIZE);
-    printf("%s\n\n", ACCOUNTS_LIST);
     
-    // loop through accounts
+    if (ext)
+    {
+        printf("%s\n\n", ACCOUNTS_TRANSFER);
+    }
+    else
+    {
+        printf("%s\n\n", ACCOUNTS_LIST);
+    }
+    
+    // display accounts
     for (int i = 1; i <= 3; i++)
     {
         if (client[0].accounts[i - 1][0] != '0')
@@ -578,7 +899,7 @@ int select_account(int sock, int stage, int ext, DB_ACCOUNT *account)
         }
     }
     
-    // get results
+    // get input
     printf("\n%s ", MISC_SELECT);
     fgets(input, INPUTSIZE, stdin);
     memcpy(dummy, input, strlen(input) - 1);
@@ -586,22 +907,35 @@ int select_account(int sock, int stage, int ext, DB_ACCOUNT *account)
     // cancel
     if ((CANCEL == dummy[0]) && (strlen(dummy) == 1))
     {
-        return FIN;
+        return FALSE;
     }
     
+    // if including external accounts
     if (ext && (strlen(dummy) == 8))
     {
         prog = 0;
         
+        for (int i = 0; i < 3; i++)
+        {
+            if (!strcmp(dummy, client[0].accounts[i]))
+            {
+                return ERROR;
+            }
+        }
+        
         // compile message
-        sprintf(message, "%c%c%s", ACCOUNTS + PAD, \
+        sprintf(message, "%c%c%s%c", ACCOUNTS + PAD, \
                 strlen(dummy) + PAD, \
-                dummy);
+                dummy, '\0');
         
         // communicate with server
-        talking(sock, message, reply);
+        if (talking(sock, message, reply) == FIN)
+        {
+            return FIN;
+        }
         
-        if ((reply[0] == FAIL) && (reply[1] == FALSE))
+        // invalid account number
+        if ((reply[0] == (FAIL + PAD)) && (reply[1] == (FALSE + PAD)))
         {
             return ERROR;
         }
@@ -611,20 +945,6 @@ int select_account(int sock, int stage, int ext, DB_ACCOUNT *account)
         memcpy(account[0].number, &reply[prog], siz);
         account[0].number[siz] = '\0';
         prog += siz;
-        
-        siz = (reply[prog++] - PAD) * sizeof(char);
-        memcpy(dummy, &reply[prog], siz);
-        dummy[siz] = '\0';
-        prog += siz;
-        
-        account[0].opening = atof(dummy);
-        
-        siz = (reply[prog++] - PAD) * sizeof(char);
-        memcpy(dummy, &reply[prog], siz);
-        dummy[siz] = '\0';
-        prog += siz;
-        
-        account[0].closing = atof(dummy);
         
         return TRUE;
     }
@@ -657,13 +977,23 @@ void numbering(int val)
     }
 }
 
-void print_money(double val)
+void print_money(double val, int pad)
 {
+    char string[INPUTSIZE], sign = ' ';
+    
     if (val < 0)
     {
-        printf("-");
+        sign = '-';
         val = fabs(val);
     }
     
-    printf("$%.2f", val);
+    if (pad)
+    {
+        sprintf(string, "%c$%.2f%c", sign, val, '\0');
+        printf("%20s", string);
+    }
+    else
+    {
+        printf("%c$%.2f", sign, val);
+    }
 }

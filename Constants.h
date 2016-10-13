@@ -19,6 +19,9 @@
 #include <math.h>
 
 #define DEFAULT_PORT    12345
+#define MAX_LIMIT       5000.0
+#define MAX_DEPOSIT     1000.0
+
 #define BACKLOG         1
 #define BUFFSIZE        100
 #define INPUTSIZE       20
@@ -27,7 +30,7 @@
 #define ERROR           -1
 #define TRUE            1
 #define FALSE           0
-#define FIN             0
+#define FIN             -2
 #define ARGS            10
 #define FAIL            1
 
@@ -35,7 +38,7 @@
 #define ACCOUNTS        2
 #define TRANSFER        3
 #define HISTORY         4
-#define FINISH          5
+#define EXTERNAL        5
 #define EXIT            6
 
 #define SAVE            11
@@ -43,11 +46,11 @@
 #define CRED            13
 #define SCALE           11
 
-#define BALA            1
-#define DEPO            2
-#define WITH            3
-#define TRAN            4
-#define HIST            5
+#define BALA            '1'
+#define DEPO            '2'
+#define WITH            '3'
+#define TRAN            '4'
+#define HIST            '5'
 
 /* @brief authentication struct
  */
@@ -83,6 +86,6 @@ typedef struct
 {
     char from[9];
     char to[9];
-    char type[2];
+    char type;
     double amount;
 } DB_TRANSACTION;

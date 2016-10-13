@@ -29,13 +29,19 @@ int auto_mach_tell(int sock);
  *  @param variable_name Description of variable
  *  @return Description of return
  */
-int with_depo_tran(int sock, int type);
+int with_depo_tran(int sock, char type);
 
 /** @brief Description
  *  @param variable_name Description of variable
  *  @return Description of return
  */
-int bala_hist(int sock, int type);
+int balance(int sock);
+
+/** @brief Description
+ *  @param variable_name Description of variable
+ *  @return Description of return
+ */
+int history(int sock);
 
 /** @brief Description
  *  @param variable_name Description of variable
@@ -53,4 +59,4 @@ void numbering(int val);
  *  @param variable_name Description of variable
  *  @return Description of return
  */
-void print_money(double val);
+void print_money(double val, int pad);
